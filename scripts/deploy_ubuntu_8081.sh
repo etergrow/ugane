@@ -126,6 +126,11 @@ publish_dist() {
   log "Публикация статических файлов в ${WEB_ROOT}"
   mkdir -p "${WEB_ROOT}"
   rsync -a --delete "${APP_ROOT}/dist/" "${WEB_ROOT}/"
+
+  # Игровые изображения лежат в корневой папке assets и нужны в runtime по пути /assets/...
+  if [[ -d "${APP_ROOT}/assets" ]]; then
+    rsync -a "${APP_ROOT}/assets/" "${WEB_ROOT}/assets/"
+  fi
 }
 
 configure_nginx() {
