@@ -8,13 +8,51 @@ set -euo pipefail
 # 4) Включает автозапуск Nginx и (при наличии UFW) открывает порт
 
 APP_NAME="ugame"
-APP_PORT="8081"
+APP_PORT_DEFAULT="8081"
+APP_PORT="${APP_PORT_DEFAULT}"
 APP_ROOT="/opt/${APP_NAME}"
 WEB_ROOT="/var/www/${APP_NAME}"
 NGINX_CONF="/etc/nginx/sites-available/${APP_NAME}-${APP_PORT}.conf"
 NGINX_LINK="/etc/nginx/sites-enabled/${APP_NAME}-${APP_PORT}.conf"
 
 PROJECT_SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+is_port_in_use() {
+  local port="$1"
+  ss -ltn "( sport = :${port} )" 2>/dev/null | tail -n +2 | grep -q .
+}
+
+select_deploy_port() {
+  local candidate
+
+  # Предпочитаем 8081, если свободен или уже занят nginx.
+  if is_port_in_use "${APP_PORT_DEFAULT}"; then
+    local listeners
+    listeners="$(ss -ltnp 2>/dev/null | grep ":${APP_PORT_DEFAULT} " || true)"
+    if [[ "${listeners}" == *"nginx"* ]]; then
+      APP_PORT="${APP_PORT_DEFAULT}"
+      return
+    fi
+  else
+    APP_PORT="${APP_PORT_DEFAULT}"
+    return
+  fi
+
+  # Ищем свободный порт в безопасных диапазонах, исключая 80/443.
+  for candidate in $(seq 8082 8099) $(seq 9000 9099); do
+    if [[ "${candidate}" == "80" || "${candidate}" == "443" ]]; then
+      continue
+    fi
+
+    if ! is_port_in_use "${candidate}"; then
+      APP_PORT="${candidate}"
+      return
+    fi
+  done
+
+  echo "Не найден свободный порт для деплоя (проверены 8081-8099 и 9000-9099)."
+  exit 1
+}
 
 log() {
   printf '\n\033[1;36m[%s]\033[0m %s\n' "$APP_NAME" "$1"
@@ -93,10 +131,13 @@ publish_dist() {
 configure_nginx() {
   log "Настройка Nginx (порт ${APP_PORT})"
 
+  NGINX_CONF="/etc/nginx/sites-available/${APP_NAME}-${APP_PORT}.conf"
+  NGINX_LINK="/etc/nginx/sites-enabled/${APP_NAME}-${APP_PORT}.conf"
+
   cat > "${NGINX_CONF}" <<EOF
 server {
-    listen ${APP_PORT} default_server;
-    listen [::]:${APP_PORT} default_server;
+    listen ${APP_PORT};
+    listen [::]:${APP_PORT};
     server_name _;
 
     root ${WEB_ROOT};
@@ -114,10 +155,19 @@ server {
 }
 EOF
 
+  # Удаляем старые конфиги этого приложения на других портах.
+  find /etc/nginx/sites-enabled -maxdepth 1 -type l -name "${APP_NAME}-*.conf" ! -name "$(basename "${NGINX_LINK}")" -delete || true
+
   ln -sf "${NGINX_CONF}" "${NGINX_LINK}"
   nginx -t
   systemctl enable nginx
-  systemctl restart nginx
+  if ! systemctl restart nginx; then
+    echo
+    echo "Не удалось запустить nginx. Диагностика:"
+    systemctl status nginx --no-pager -l || true
+    journalctl -xeu nginx --no-pager -n 80 || true
+    exit 1
+  fi
 }
 
 open_firewall_port() {
@@ -145,6 +195,7 @@ print_summary() {
 
 install_base_packages
 install_nodejs_20
+select_deploy_port
 sync_project
 build_project
 publish_dist
