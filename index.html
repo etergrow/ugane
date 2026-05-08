@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UGANE: Point and Click</title>
+  </head>
+  <body>
+    <div id="root">
+      <div
+        id="bootStatus"
+        style="
+          margin: 24px;
+          padding: 14px 16px;
+          border: 1px solid rgba(255,255,255,0.35);
+          border-radius: 10px;
+          color: #eaf9ff;
+          background: rgba(5, 20, 30, 0.55);
+          font: 500 14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        "
+      >
+        Инициализация React-приложения...
+      </div>
+    </div>
+    <script>
+      // Простая проверка: если этот текст меняется, значит обычный JS в браузере работает.
+      const bootStatus = document.getElementById("bootStatus");
+      if (bootStatus) {
+        bootStatus.textContent = "JS запущен, начинаю загрузку React-модулей...";
+      }
+    </script>
+    <script type="module">
+      // Загружаем главный модуль вручную, чтобы поймать и показать ошибку импорта на самой странице.
+      const bootStatus = document.getElementById("bootStatus");
+      if (bootStatus) {
+        bootStatus.textContent = "Загрузка /src/main.jsx...";
+      }
+
+      import("/src/main.jsx")
+        .then(() => {
+          // Если модуль загрузился, React перерисует #root, и этот текст пропадёт автоматически.
+        })
+        .catch((error) => {
+          if (bootStatus) {
+            bootStatus.textContent =
+              "Ошибка загрузки main.jsx: " + (error?.message || String(error));
+          }
+          console.error(error);
+        });
+    </script>
+  </body>
+</html>
