@@ -2,6 +2,7 @@ import React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { GameCanvas } from "./components/GameCanvas.jsx";
 import { SceneModal } from "./components/SceneModal.jsx";
+import { SiemModal } from "./components/SiemModal.jsx";
 import { DETAIL_SCENES, DETAIL_SCENE_ITEM_IDS } from "./config/detailScenesConfig.js";
 
 const DEFAULT_SELECTED_TEXT = "Ничего не выбрано";
@@ -16,6 +17,7 @@ const GAME_MODE = {
   FREE: "free",
 };
 const TIMED_MODE_SECONDS = 60;
+const SOC_SIEM_ITEM_IDS = new Set(["soc_stol_and_monitors"]);
 
 function formatTimer(totalSeconds) {
   const minutes = Math.floor(totalSeconds / 60);
@@ -35,6 +37,12 @@ export function App() {
   const [lastRunScore, setLastRunScore] = useState(0);
   const [lastRunFoundCount, setLastRunFoundCount] = useState(0);
   const [finishReason, setFinishReason] = useState("manual");
+  const [isSiemOpen, setIsSiemOpen] = useState(false);
+  const [siemStats, setSiemStats] = useState({
+    resolved: 0,
+    correct: 0,
+    wrong: 0,
+  });
 
   const activeScene = activeSceneId ? DETAIL_SCENES[activeSceneId] : null;
 
@@ -60,6 +68,12 @@ export function App() {
     setSelectedName(DEFAULT_SELECTED_TEXT);
     setHoverHint(DEFAULT_HOVER_HINT);
     setActiveSceneId(null);
+    setIsSiemOpen(false);
+    setSiemStats({
+      resolved: 0,
+      correct: 0,
+      wrong: 0,
+    });
   }, []);
 
   const handleStartGame = useCallback((mode) => {
@@ -79,6 +93,7 @@ export function App() {
     setLastRunFoundCount(discoveredViolationsCount);
     setFinishReason(reason);
     setActiveSceneId(null);
+    setIsSiemOpen(false);
     setGamePhase(GAME_PHASE.FINISHED);
   }, [discoveredViolationsCount, isPlaying, totalScore]);
 
@@ -108,15 +123,26 @@ export function App() {
     }
 
     if (!DETAIL_SCENE_ITEM_IDS.has(item.id)) {
+      if (SOC_SIEM_ITEM_IDS.has(item.id)) {
+        setActiveSceneId(null);
+        setIsSiemOpen(true);
+        setHoverHint("Обработай алерты в SIEM: TP -> инцидент, FP -> закрыть");
+      }
       return;
     }
 
+    setIsSiemOpen(false);
     setActiveSceneId(item.id);
     setHoverHint("Найди все нарушения на детальной сцене и кликай по ним");
   }, [isPlaying]);
 
   const handleCloseScene = useCallback(() => {
     setActiveSceneId(null);
+    setHoverHint(DEFAULT_HOVER_HINT);
+  }, []);
+
+  const handleCloseSiem = useCallback(() => {
+    setIsSiemOpen(false);
     setHoverHint(DEFAULT_HOVER_HINT);
   }, []);
 
@@ -136,6 +162,25 @@ export function App() {
       setSelectedName(`${foundData.title} (+${foundData.score} очков)`);
       return nextSet;
     });
+  }, [isPlaying]);
+
+  const handleSiemAlertResolved = useCallback((resolution) => {
+    if (!isPlaying) {
+      return;
+    }
+
+    setSiemStats((previousStats) => ({
+      resolved: previousStats.resolved + 1,
+      correct: previousStats.correct + (resolution.isCorrect ? 1 : 0),
+      wrong: previousStats.wrong + (resolution.isCorrect ? 0 : 1),
+    }));
+
+    if (resolution.isCorrect) {
+      setTotalScore((previousScore) => previousScore + resolution.scoreAward);
+      setSelectedName(`SIEM: верно (${resolution.scoreAward} очков)`);
+    } else {
+      setSelectedName("SIEM: решение неверное (0 очков)");
+    }
   }, [isPlaying]);
 
   return (
@@ -163,6 +208,9 @@ export function App() {
           <p className="score-box__value">
             Очки: {totalScore} | Нарушения: {discoveredViolationsCount}/{totalViolationsCount}
           </p>
+          <p className="score-box__siem">
+            SIEM: {siemStats.correct} верно / {siemStats.wrong} неверно
+          </p>
           {shouldShowTimer ? <p className="score-box__timer">Таймер: {timerText}</p> : null}
         </div>
       </header>
@@ -187,6 +235,10 @@ export function App() {
           onClose={handleCloseScene}
           onHotspotFound={handleHotspotFound}
         />
+      ) : null}
+
+      {isSiemOpen ? (
+        <SiemModal onClose={handleCloseSiem} onAlertResolved={handleSiemAlertResolved} />
       ) : null}
 
       {gamePhase !== GAME_PHASE.PLAYING ? (

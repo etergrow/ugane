@@ -416,6 +416,315 @@ body {
   animation: found-text 0.82s ease-out forwards;
 }
 
+.score-box__siem {
+  margin: 6px 0 0;
+  color: #9fd0df;
+  font-size: 0.82rem;
+}
+
+.siem-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 130;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(2, 8, 16, 0.86);
+  backdrop-filter: blur(7px);
+}
+
+.siem-modal {
+  width: min(1460px, 98vw);
+  max-height: 96vh;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid rgba(76, 164, 210, 0.45);
+  background:
+    linear-gradient(180deg, rgba(4, 17, 29, 0.98), rgba(2, 11, 22, 0.98)),
+    radial-gradient(circle at 78% 0%, rgba(0, 116, 189, 0.18), transparent 45%);
+  box-shadow:
+    0 30px 60px rgba(0, 0, 0, 0.64),
+    0 0 0 1px rgba(141, 208, 255, 0.13) inset;
+  display: grid;
+  grid-template-rows: auto auto minmax(200px, 1fr);
+}
+
+.siem-modal__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(67, 132, 172, 0.37);
+  background: rgba(2, 15, 28, 0.75);
+}
+
+.siem-modal__title {
+  margin: 0;
+  font-family: "Orbitron", "Exo 2", sans-serif;
+  letter-spacing: 0.05em;
+  font-size: 1.24rem;
+  color: #9bdfff;
+}
+
+.siem-modal__subtitle {
+  margin: 6px 0 0;
+  color: #98c4de;
+  font-size: 0.9rem;
+}
+
+.siem-modal__close {
+  border: 1px solid rgba(120, 199, 242, 0.5);
+  border-radius: 9px;
+  padding: 8px 12px;
+  font-weight: 700;
+  color: #dff5ff;
+  background: rgba(11, 45, 66, 0.85);
+  cursor: pointer;
+}
+
+.siem-modal__close:hover {
+  background: rgba(18, 61, 90, 0.95);
+}
+
+.siem-kpi-grid {
+  padding: 12px 16px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(140px, 1fr));
+  gap: 10px;
+  border-bottom: 1px solid rgba(67, 132, 172, 0.27);
+}
+
+.siem-kpi-card {
+  border: 1px solid rgba(68, 133, 171, 0.42);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: rgba(4, 24, 40, 0.72);
+}
+
+.siem-kpi-card__label {
+  margin: 0;
+  color: #86aeca;
+  font-size: 0.78rem;
+}
+
+.siem-kpi-card__value {
+  margin: 8px 0 0;
+  color: #e5f8ff;
+  font-size: 1.38rem;
+  font-weight: 700;
+}
+
+.siem-kpi-card__value--critical {
+  color: #ff7b7b;
+}
+
+.siem-kpi-card__value--high {
+  color: #ffb26b;
+}
+
+.siem-table {
+  display: grid;
+  grid-template-rows: auto minmax(180px, 1fr);
+  min-height: 0;
+}
+
+.siem-table__head,
+.siem-table__row {
+  display: grid;
+  grid-template-columns: 90px 130px 170px 150px 1fr 180px;
+  gap: 10px;
+  align-items: center;
+}
+
+.siem-table__head {
+  padding: 10px 16px;
+  font-size: 0.78rem;
+  color: #8cb6d5;
+  border-bottom: 1px solid rgba(63, 125, 164, 0.28);
+}
+
+.siem-table__body {
+  overflow: auto;
+  padding: 6px 8px 10px;
+}
+
+.siem-table__row {
+  width: 100%;
+  text-align: left;
+  border: 1px solid rgba(57, 112, 145, 0.25);
+  border-radius: 8px;
+  margin: 6px 8px;
+  padding: 9px 10px;
+  font-size: 0.82rem;
+  color: #d3e9f9;
+  background: rgba(2, 16, 28, 0.7);
+  cursor: pointer;
+}
+
+.siem-table__row:hover {
+  border-color: rgba(101, 191, 244, 0.54);
+  background: rgba(8, 33, 52, 0.8);
+}
+
+.siem-severity {
+  font-weight: 700;
+}
+
+.siem-severity--critical {
+  color: #ff6969;
+}
+
+.siem-severity--high {
+  color: #ffb570;
+}
+
+.siem-severity--medium {
+  color: #ffda7a;
+}
+
+.siem-severity--low {
+  color: #73e8a0;
+}
+
+.siem-severity--info {
+  color: #73c9ff;
+}
+
+.siem-alert-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 131;
+  display: grid;
+  place-items: center;
+  padding: 14px;
+  background: rgba(1, 8, 14, 0.56);
+}
+
+.siem-alert-modal {
+  width: min(760px, 96vw);
+  border-radius: 14px;
+  border: 1px solid rgba(92, 172, 217, 0.42);
+  background: rgba(4, 22, 36, 0.98);
+  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.6);
+  padding: 16px 16px 14px;
+}
+
+.siem-alert-modal__title {
+  margin: 0;
+  color: #ccefff;
+  font-size: 1.12rem;
+  font-weight: 700;
+}
+
+.siem-alert-modal__meta {
+  margin: 8px 0 0;
+  font-size: 0.86rem;
+  color: #95c4dd;
+}
+
+.siem-alert-modal__text {
+  margin: 12px 0 0;
+  color: #e3f5ff;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.siem-alert-modal__actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.siem-alert-modal__btn {
+  border: 1px solid transparent;
+  border-radius: 9px;
+  padding: 9px 12px;
+  font-weight: 700;
+  cursor: pointer;
+  color: #fff;
+}
+
+.siem-alert-modal__btn:disabled,
+.siem-alert-modal__dismiss:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.siem-alert-modal__btn--incident {
+  background: linear-gradient(140deg, rgba(204, 65, 46, 0.95), rgba(170, 42, 35, 0.95));
+  border-color: rgba(255, 146, 127, 0.6);
+}
+
+.siem-alert-modal__btn--close {
+  background: linear-gradient(140deg, rgba(38, 131, 110, 0.95), rgba(20, 98, 84, 0.95));
+  border-color: rgba(130, 240, 205, 0.5);
+}
+
+.siem-alert-modal__dismiss {
+  margin-top: 10px;
+  border: 1px solid rgba(95, 175, 217, 0.44);
+  border-radius: 8px;
+  padding: 7px 11px;
+  background: rgba(10, 35, 54, 0.82);
+  color: #ccefff;
+  cursor: pointer;
+}
+
+.siem-judgement-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 132;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  animation: siem-judgement-fade 2.8s ease-out forwards;
+}
+
+.siem-judgement-overlay--success {
+  background: radial-gradient(circle, rgba(44, 214, 118, 0.22), rgba(12, 62, 35, 0.65));
+}
+
+.siem-judgement-overlay--fail {
+  background: radial-gradient(circle, rgba(255, 89, 89, 0.22), rgba(72, 20, 20, 0.68));
+}
+
+.siem-judgement-overlay__card {
+  min-width: min(520px, 92vw);
+  text-align: center;
+  border-radius: 18px;
+  padding: 20px 24px;
+  border: 2px solid rgba(220, 244, 255, 0.65);
+  background: rgba(3, 17, 29, 0.9);
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.45);
+  animation: siem-judgement-card-pop 2.6s cubic-bezier(0.22, 0.88, 0.34, 1);
+}
+
+.siem-judgement-overlay__title {
+  margin: 0;
+  font-size: clamp(1.2rem, 3vw, 2rem);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #f0fbff;
+}
+
+.siem-judgement-overlay__score {
+  margin: 10px 0 0;
+  font-family: "Orbitron", "Exo 2", sans-serif;
+  font-size: clamp(1.6rem, 4.4vw, 3.4rem);
+  font-weight: 800;
+}
+
+.siem-judgement-overlay--success .siem-judgement-overlay__score {
+  color: #98ffbe;
+  text-shadow: 0 0 22px rgba(101, 255, 157, 0.76);
+}
+
+.siem-judgement-overlay--fail .siem-judgement-overlay__score {
+  color: #ffaaaa;
+  text-shadow: 0 0 20px rgba(255, 110, 110, 0.7);
+}
+
 @keyframes found-burst {
   0% {
     opacity: 0;
@@ -479,6 +788,37 @@ body {
   }
 }
 
+@keyframes siem-judgement-fade {
+  0% {
+    opacity: 0;
+  }
+
+  15% {
+    opacity: 0.85;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes siem-judgement-card-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+
+  22% {
+    opacity: 1;
+    transform: scale(1.03);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 @media (max-width: 900px) {
   .app {
     width: 100%;
@@ -514,6 +854,28 @@ body {
 
   .game-overlay__start-btn {
     min-width: 100%;
+  }
+
+  .siem-modal {
+    grid-template-rows: auto auto minmax(160px, 1fr);
+  }
+
+  .siem-kpi-grid {
+    grid-template-columns: repeat(2, minmax(120px, 1fr));
+  }
+
+  .siem-table__head {
+    display: none;
+  }
+
+  .siem-table__row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+    font-size: 0.8rem;
+  }
+
+  .siem-alert-modal__actions {
+    flex-direction: column;
   }
 
   .scene-hotspot {
