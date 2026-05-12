@@ -194,8 +194,9 @@ export function SceneModal({ scene, foundHotspotIds, onClose, onHotspotFound }) 
   };
 
   const handleScenePointerDown = (event) => {
-    if (event.pointerType === "touch") {
-      event.preventDefault();
+    // Если клик начался по hotspot, не включаем перетаскивание сцены.
+    if (event.target instanceof Element && event.target.closest(".scene-hotspot")) {
+      return;
     }
 
     pointersRef.current.set(event.pointerId, {
@@ -255,10 +256,6 @@ export function SceneModal({ scene, foundHotspotIds, onClose, onHotspotFound }) 
       });
     }
 
-    if (event.pointerType === "touch") {
-      event.preventDefault();
-    }
-
     if (pinchStateRef.current.active && pointersRef.current.size >= 2) {
       const [first, second] = getTwoPointers();
       const currentDistance = Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY);
@@ -315,10 +312,6 @@ export function SceneModal({ scene, foundHotspotIds, onClose, onHotspotFound }) 
   };
 
   const finishSceneDrag = (event) => {
-    if (event.pointerType === "touch") {
-      event.preventDefault();
-    }
-
     if (pointersRef.current.has(event.pointerId)) {
       pointersRef.current.delete(event.pointerId);
     }
@@ -466,6 +459,10 @@ export function SceneModal({ scene, foundHotspotIds, onClose, onHotspotFound }) 
                   }}
                   onMouseEnter={() => setHoveredHotspotId(hotspot.id)}
                   onMouseLeave={() => setHoveredHotspotId(null)}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onPointerMove={(event) => event.stopPropagation()}
+                  onPointerUp={(event) => event.stopPropagation()}
+                  onPointerCancel={(event) => event.stopPropagation()}
                   onClick={() => handleHotspotClick(hotspot)}
                   aria-label={hotspot.title}
                   title={isFound ? `Найдено: ${hotspot.title}` : `Нарушение: ${hotspot.title}`}
