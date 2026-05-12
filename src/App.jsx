@@ -6,7 +6,7 @@ import { SiemModal } from "./components/SiemModal.jsx";
 import { DETAIL_SCENES, DETAIL_SCENE_ITEM_IDS } from "./config/detailScenesConfig.js";
 
 const DEFAULT_SELECTED_TEXT = "Ничего не выбрано";
-const DEFAULT_HOVER_HINT = "Наведи курсор на объект, чтобы увидеть подсветку";
+const DEFAULT_HOVER_HINT = "Зажми и перетаскивай карту, затем кликай по объектам";
 const GAME_PHASE = {
   INTRO: "intro",
   PLAYING: "playing",
@@ -26,6 +26,12 @@ function formatTimer(totalSeconds) {
 }
 
 export function App() {
+  const [isMobileLayout, setIsMobileLayout] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia("(max-width: 900px)").matches : false,
+  );
+  const [isHudCollapsed, setIsHudCollapsed] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia("(max-width: 900px)").matches : false,
+  );
   const [selectedName, setSelectedName] = useState(DEFAULT_SELECTED_TEXT);
   const [hoverHint, setHoverHint] = useState(DEFAULT_HOVER_HINT);
   const [activeSceneId, setActiveSceneId] = useState(null);
@@ -56,6 +62,19 @@ export function App() {
   const isTimedMode = gameMode === GAME_MODE.TIMED;
   const shouldShowTimer = isPlaying && isTimedMode;
   const timerText = formatTimer(timeLeftSeconds);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 900px)");
+    const applyLayout = (matches) => {
+      setIsMobileLayout(matches);
+      setIsHudCollapsed(matches);
+    };
+
+    applyLayout(mediaQuery.matches);
+    const onChange = (event) => applyLayout(event.matches);
+    mediaQuery.addEventListener("change", onChange);
+    return () => mediaQuery.removeEventListener("change", onChange);
+  }, []);
 
   const handleLoadError = useCallback(() => {
     setSelectedName("Ошибка загрузки сцены");
@@ -185,35 +204,51 @@ export function App() {
 
   return (
     <main className="app">
-      <header className="top-panel">
-        <div className="selected-box">
-          <p className="selected-box__label">Последний клик</p>
-          <p className="selected-box__value">{selectedName}</p>
-        </div>
-
-        <div className="top-panel__center">
+      <section className={`hud ${isHudCollapsed ? "hud--collapsed" : ""}`}>
+        {isMobileLayout ? (
           <button
             type="button"
-            className="end-game-btn"
-            onClick={() => handleEndGame("manual")}
-            disabled={!isPlaying || isTimedMode}
-            aria-disabled={!isPlaying || isTimedMode}
+            className="hud-toggle-btn"
+            onClick={() => setIsHudCollapsed((previousValue) => !previousValue)}
           >
-            Завершить игру
+            {isHudCollapsed ? "Показать меню" : "Скрыть меню"}
           </button>
-        </div>
+        ) : null}
 
-        <div className="score-box">
-          <p className="score-box__label">Прогресс ИБ</p>
-          <p className="score-box__value">
-            Очки: {totalScore} | Нарушения: {discoveredViolationsCount}/{totalViolationsCount}
-          </p>
-          <p className="score-box__siem">
-            SIEM: {siemStats.correct} верно / {siemStats.wrong} неверно
-          </p>
-          {shouldShowTimer ? <p className="score-box__timer">Таймер: {timerText}</p> : null}
-        </div>
-      </header>
+        <header className="top-panel">
+          <div className="selected-box">
+            <p className="selected-box__label">Последний клик</p>
+            <p className="selected-box__value">{selectedName}</p>
+          </div>
+
+          <div className="top-panel__center">
+            <button
+              type="button"
+              className="end-game-btn"
+              onClick={() => handleEndGame("manual")}
+              disabled={!isPlaying || isTimedMode}
+              aria-disabled={!isPlaying || isTimedMode}
+            >
+              Завершить игру
+            </button>
+          </div>
+
+          <div className="score-box">
+            <p className="score-box__label">Прогресс ИБ</p>
+            <p className="score-box__value">
+              Очки: {totalScore} | Нарушения: {discoveredViolationsCount}/{totalViolationsCount}
+            </p>
+            <p className="score-box__siem">
+              SIEM: {siemStats.correct} верно / {siemStats.wrong} неверно
+            </p>
+            {shouldShowTimer ? <p className="score-box__timer">Таймер: {timerText}</p> : null}
+          </div>
+        </header>
+
+        <section className="bottom-panel">
+          <p className="bottom-panel__text">{hoverHint}</p>
+        </section>
+      </section>
 
       <section className="game-shell">
         <GameCanvas
@@ -223,11 +258,7 @@ export function App() {
           onLoadError={handleLoadError}
         />
       </section>
-
-      <section className="bottom-panel">
-        <p className="bottom-panel__text">{hoverHint}</p>
-      </section>
-
+      
       {activeScene ? (
         <SceneModal
           scene={activeScene}

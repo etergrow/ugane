@@ -1,10 +1,20 @@
+// Приводит путь к изображению к абсолютному, если это локальный ассет.
+export function resolveAssetPath(src) {
+  if (!src) return src;
+  if (/^(https?:)?\/\//i.test(src)) return src;
+  if (src.startsWith("data:")) return src;
+  if (src.startsWith("/")) return src;
+  return `/${src}`;
+}
+
 // Загружает изображение и возвращает готовый HTMLImageElement.
 export function loadImage(src) {
+  const resolvedSrc = resolveAssetPath(src);
   return new Promise((resolve, reject) => {
     const image = new Image();
     image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error(`Не удалось загрузить изображение: ${src}`));
-    image.src = src;
+    image.onerror = () => reject(new Error(`Не удалось загрузить изображение: ${resolvedSrc}`));
+    image.src = resolvedSrc;
   });
 }
 

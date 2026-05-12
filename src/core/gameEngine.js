@@ -16,12 +16,36 @@ export class PointClickGame {
     this.selectedItemId = null;
     this.startTimestamp = performance.now();
     this.itemSeeds = new Map();
+    this.isCoarsePointer = window.matchMedia("(pointer:coarse)").matches;
+    this.zoom = this.isCoarsePointer ? 2.35 : 1.65;
+    this.minZoom = 1.1;
+    this.maxZoom = 3.2;
+    this.dragThresholdPx = this.isCoarsePointer ? 14 : 6;
+    this.cameraX = 0;
+    this.cameraY = 0;
+    this.isPointerDown = false;
+    this.activePointerId = null;
+    this.dragMoved = false;
+    this.dragStartClientX = 0;
+    this.dragStartClientY = 0;
+    this.dragStartCameraX = 0;
+    this.dragStartCameraY = 0;
+    this.pointers = new Map();
+    this.isPinching = false;
+    this.pinchStartDistance = 0;
+    this.pinchStartZoom = this.zoom;
+    this.pinchFocusSceneX = 0;
+    this.pinchFocusSceneY = 0;
 
     this.animationFrameId = null;
     this.boundDraw = this.draw.bind(this);
+    this.boundOnPointerDown = this.onPointerDown.bind(this);
     this.boundOnPointerMove = this.onPointerMove.bind(this);
+    this.boundOnPointerUp = this.onPointerUp.bind(this);
+    this.boundOnPointerCancel = this.onPointerCancel.bind(this);
     this.boundOnPointerLeave = this.onPointerLeave.bind(this);
-    this.boundOnClick = this.onClick.bind(this);
+    this.boundOnPointerLostCapture = this.onPointerLostCapture.bind(this);
+    this.boundOnWheel = this.onWheel.bind(this);
     this.boundOnResize = this.onResize.bind(this);
   }
 
@@ -30,6 +54,10 @@ export class PointClickGame {
       await this.loadScene();
       this.attachEvents();
       this.onResize();
+      this.canvas.style.cursor = "grab";
+      if (this.onHoverChange) {
+        this.onHoverChange("Зажми и перетаскивай карту, затем кликай по объектам");
+      }
       this.animationFrameId = requestAnimationFrame(this.boundDraw);
     } catch (error) {
       if (this.onLoadError) {
@@ -96,9 +124,13 @@ export class PointClickGame {
   }
 
   attachEvents() {
+    this.canvas.addEventListener("pointerdown", this.boundOnPointerDown);
     this.canvas.addEventListener("pointermove", this.boundOnPointerMove);
+    this.canvas.addEventListener("pointerup", this.boundOnPointerUp);
+    this.canvas.addEventListener("pointercancel", this.boundOnPointerCancel);
     this.canvas.addEventListener("pointerleave", this.boundOnPointerLeave);
-    this.canvas.addEventListener("click", this.boundOnClick);
+    this.canvas.addEventListener("lostpointercapture", this.boundOnPointerLostCapture);
+    this.canvas.addEventListener("wheel", this.boundOnWheel, { passive: false });
     window.addEventListener("resize", this.boundOnResize);
   }
 
@@ -110,36 +142,241 @@ export class PointClickGame {
     this.canvas.height = Math.floor(rect.height * pixelRatio);
 
     this.ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-    this.ctx.imageSmoothingEnabled = true;
+    this.ctx.imageSmoothingEnabled = false;
+    this.clampCameraToScene();
+  }
+
+  onPointerDown(event) {
+    if (event.pointerType === "touch") {
+      event.preventDefault();
+    }
+
+    this.pointers.set(event.pointerId, {
+      clientX: event.clientX,
+      clientY: event.clientY,
+    });
+    this.canvas.setPointerCapture(event.pointerId);
+
+    if (this.pointers.size === 2) {
+      const [first, second] = this.getTwoPointerValues();
+      this.isPinching = true;
+      this.isPointerDown = false;
+      this.activePointerId = null;
+      this.dragMoved = true;
+      this.pinchStartDistance = this.getPointerDistance(first, second);
+      this.pinchStartZoom = this.zoom;
+      const midpoint = this.getPointerMidpoint(first, second);
+      const focusPoint = this.getScenePointFromClient(midpoint.clientX, midpoint.clientY);
+      this.pinchFocusSceneX = focusPoint.x;
+      this.pinchFocusSceneY = focusPoint.y;
+      this.canvas.style.cursor = "grabbing";
+      return;
+    }
+
+    if (this.pointers.size > 2) {
+      this.isPinching = true;
+      this.isPointerDown = false;
+      this.activePointerId = null;
+      this.dragMoved = true;
+      return;
+    }
+
+    this.isPinching = false;
+    this.isPointerDown = true;
+    this.activePointerId = event.pointerId;
+    this.dragMoved = false;
+    this.dragStartClientX = event.clientX;
+    this.dragStartClientY = event.clientY;
+    this.dragStartCameraX = this.cameraX;
+    this.dragStartCameraY = this.cameraY;
+    this.canvas.style.cursor = "grabbing";
   }
 
   onPointerMove(event) {
-    const point = this.getScenePoint(event);
-    const hovered = this.findTopItemAt(point.x, point.y);
-    this.hoveredItemId = hovered ? hovered.id : null;
+    if (this.pointers.has(event.pointerId)) {
+      this.pointers.set(event.pointerId, {
+        clientX: event.clientX,
+        clientY: event.clientY,
+      });
+    }
 
-    if (hovered) {
-      this.canvas.style.cursor = "pointer";
-      if (this.onHoverChange) {
-        this.onHoverChange(`Наведение: ${hovered.name}`);
+    if (event.pointerType === "touch") {
+      event.preventDefault();
+    }
+
+    if (this.isPinching && this.pointers.size >= 2) {
+      const [first, second] = this.getTwoPointerValues();
+      const distance = this.getPointerDistance(first, second);
+      if (distance > 0 && this.pinchStartDistance > 0) {
+        this.zoom = Math.min(
+          this.maxZoom,
+          Math.max(this.minZoom, this.pinchStartZoom * (distance / this.pinchStartDistance)),
+        );
+
+        const midpoint = this.getPointerMidpoint(first, second);
+        const afterFocusPoint = this.getScenePointFromClient(midpoint.clientX, midpoint.clientY);
+        this.cameraX += this.pinchFocusSceneX - afterFocusPoint.x;
+        this.cameraY += this.pinchFocusSceneY - afterFocusPoint.y;
+        this.clampCameraToScene();
       }
-    } else {
-      this.canvas.style.cursor = "default";
+      return;
+    }
+
+    if (!this.isPointerDown || this.activePointerId !== event.pointerId) {
+      this.updateHoverState(event);
+      return;
+    }
+
+    const rect = this.canvas.getBoundingClientRect();
+    const view = this.getViewportInSceneSpace(rect.width, rect.height);
+    const deltaXScreen = event.clientX - this.dragStartClientX;
+    const deltaYScreen = event.clientY - this.dragStartClientY;
+    const scenePerScreenX = view.width / Math.max(1, rect.width);
+    const scenePerScreenY = view.height / Math.max(1, rect.height);
+
+    this.cameraX = this.dragStartCameraX - deltaXScreen * scenePerScreenX;
+    this.cameraY = this.dragStartCameraY - deltaYScreen * scenePerScreenY;
+    this.clampCameraToScene();
+
+    if (!this.dragMoved && Math.hypot(deltaXScreen, deltaYScreen) > this.dragThresholdPx) {
+      this.dragMoved = true;
+      this.hoveredItemId = null;
       if (this.onHoverChange) {
-        this.onHoverChange("Наведи курсор на объект, чтобы увидеть подсветку");
+        this.onHoverChange("Перетаскивай карту, чтобы исследовать локацию");
       }
     }
   }
 
-  onPointerLeave() {
+  onPointerUp(event) {
+    this.cleanupPointer(event.pointerId);
+
+    if (this.isPinching) {
+      if (this.pointers.size < 2) {
+        this.isPinching = false;
+        if (this.pointers.size === 1) {
+          const [remainingId, remaining] = this.pointers.entries().next().value;
+          this.isPointerDown = true;
+          this.activePointerId = remainingId;
+          this.dragMoved = true;
+          this.dragStartClientX = remaining.clientX;
+          this.dragStartClientY = remaining.clientY;
+          this.dragStartCameraX = this.cameraX;
+          this.dragStartCameraY = this.cameraY;
+          this.canvas.style.cursor = "grabbing";
+          return;
+        }
+      }
+    }
+
+    if (!this.isPointerDown || this.activePointerId !== event.pointerId) {
+      if (!this.isPinching) {
+        this.canvas.style.cursor = "grab";
+      }
+      return;
+    }
+
+    this.isPointerDown = false;
+    this.activePointerId = null;
+    this.canvas.style.cursor = "grab";
+
+    if (!this.dragMoved) {
+      this.onPointerTap(event);
+    }
+  }
+
+  onPointerCancel(event) {
+    this.cleanupPointer(event.pointerId);
+    if (this.pointers.size < 2) {
+      this.isPinching = false;
+    }
+    if (this.activePointerId !== event.pointerId) {
+      if (this.pointers.size === 0) {
+        this.canvas.style.cursor = "grab";
+      }
+      return;
+    }
+
+    this.isPointerDown = false;
+    this.activePointerId = null;
+    this.dragMoved = false;
+    this.canvas.style.cursor = "grab";
+  }
+
+  onPointerLeave(event) {
+    if (this.pointers.has(event.pointerId)) {
+      this.cleanupPointer(event.pointerId);
+    }
+
+    if (this.isPointerDown || this.isPinching) return;
+
     this.hoveredItemId = null;
-    this.canvas.style.cursor = "default";
+    this.canvas.style.cursor = "grab";
     if (this.onHoverChange) {
-      this.onHoverChange("Наведи курсор на объект, чтобы увидеть подсветку");
+      this.onHoverChange("Зажми и перетаскивай карту, затем кликай по объектам");
     }
   }
 
-  onClick(event) {
+  onPointerLostCapture(event) {
+    if (this.pointers.has(event.pointerId)) {
+      this.cleanupPointer(event.pointerId);
+    }
+
+    if (this.activePointerId === event.pointerId) {
+      this.isPointerDown = false;
+      this.activePointerId = null;
+      this.dragMoved = false;
+    }
+
+    if (this.pointers.size < 2) {
+      this.isPinching = false;
+    }
+
+    if (this.pointers.size === 0) {
+      this.canvas.style.cursor = "grab";
+    }
+  }
+
+  onWheel(event) {
+    event.preventDefault();
+
+    const beforePoint = this.getScenePointFromClient(event.clientX, event.clientY);
+    const previousZoom = this.zoom;
+    const delta = event.deltaY > 0 ? -0.08 : 0.08;
+    this.zoom = Math.min(this.maxZoom, Math.max(this.minZoom, this.zoom + delta));
+    if (Math.abs(this.zoom - previousZoom) < 0.0001) return;
+
+    this.clampCameraToScene();
+    const afterPoint = this.getScenePointFromClient(event.clientX, event.clientY);
+    this.cameraX += beforePoint.x - afterPoint.x;
+    this.cameraY += beforePoint.y - afterPoint.y;
+    this.clampCameraToScene();
+  }
+
+  getTwoPointerValues() {
+    return Array.from(this.pointers.values()).slice(0, 2);
+  }
+
+  getPointerDistance(first, second) {
+    return Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY);
+  }
+
+  getPointerMidpoint(first, second) {
+    return {
+      clientX: (first.clientX + second.clientX) / 2,
+      clientY: (first.clientY + second.clientY) / 2,
+    };
+  }
+
+  cleanupPointer(pointerId) {
+    if (this.pointers.has(pointerId)) {
+      this.pointers.delete(pointerId);
+    }
+    if (this.canvas.hasPointerCapture(pointerId)) {
+      this.canvas.releasePointerCapture(pointerId);
+    }
+  }
+
+  onPointerTap(event) {
     const point = this.getScenePoint(event);
     const clicked = this.findTopItemAt(point.x, point.y);
 
@@ -157,15 +394,81 @@ export class PointClickGame {
     }
   }
 
+  updateHoverState(event) {
+    const point = this.getScenePoint(event);
+    const hovered = this.findTopItemAt(point.x, point.y);
+    this.hoveredItemId = hovered ? hovered.id : null;
+
+    if (hovered) {
+      this.canvas.style.cursor = "pointer";
+      if (this.onHoverChange) {
+        this.onHoverChange(`Наведение: ${hovered.name}`);
+      }
+    } else {
+      this.canvas.style.cursor = "grab";
+      if (this.onHoverChange) {
+        this.onHoverChange("Зажми и перетаскивай карту, затем кликай по объектам");
+      }
+    }
+  }
+
   getScenePoint(event) {
+    return this.getScenePointFromClient(event.clientX, event.clientY);
+  }
+
+  getScenePointFromClient(clientX, clientY) {
     const rect = this.canvas.getBoundingClientRect();
-    const scaleX = BASE_SCENE.width / rect.width;
-    const scaleY = BASE_SCENE.height / rect.height;
+    const view = this.getViewportInSceneSpace(rect.width, rect.height);
+    const localX = clientX - rect.left;
+    const localY = clientY - rect.top;
 
     return {
-      x: (event.clientX - rect.left) * scaleX,
-      y: (event.clientY - rect.top) * scaleY,
+      x: this.cameraX + (localX / Math.max(1, rect.width)) * view.width,
+      y: this.cameraY + (localY / Math.max(1, rect.height)) * view.height,
     };
+  }
+
+  getViewportInSceneSpace(canvasWidth, canvasHeight) {
+    const safeWidth = Math.max(1, canvasWidth);
+    const safeHeight = Math.max(1, canvasHeight);
+    const canvasAspect = safeWidth / safeHeight;
+    const sceneAspect = BASE_SCENE.width / BASE_SCENE.height;
+
+    let viewportWidth;
+    let viewportHeight;
+
+    if (canvasAspect >= sceneAspect) {
+      viewportHeight = BASE_SCENE.height / this.zoom;
+      viewportWidth = viewportHeight * canvasAspect;
+
+      if (viewportWidth > BASE_SCENE.width) {
+        viewportWidth = BASE_SCENE.width;
+        viewportHeight = viewportWidth / canvasAspect;
+      }
+    } else {
+      viewportWidth = BASE_SCENE.width / this.zoom;
+      viewportHeight = viewportWidth / canvasAspect;
+
+      if (viewportHeight > BASE_SCENE.height) {
+        viewportHeight = BASE_SCENE.height;
+        viewportWidth = viewportHeight * canvasAspect;
+      }
+    }
+
+    return {
+      width: viewportWidth,
+      height: viewportHeight,
+    };
+  }
+
+  clampCameraToScene() {
+    const rect = this.canvas.getBoundingClientRect();
+    const view = this.getViewportInSceneSpace(rect.width, rect.height);
+    const maxX = Math.max(0, BASE_SCENE.width - view.width);
+    const maxY = Math.max(0, BASE_SCENE.height - view.height);
+
+    this.cameraX = Math.min(maxX, Math.max(0, this.cameraX));
+    this.cameraY = Math.min(maxY, Math.max(0, this.cameraY));
   }
 
   findTopItemAt(sceneX, sceneY) {
@@ -206,18 +509,29 @@ export class PointClickGame {
   draw(timestamp) {
     const width = this.canvas.getBoundingClientRect().width;
     const height = this.canvas.getBoundingClientRect().height;
+    const view = this.getViewportInSceneSpace(width, height);
 
     this.ctx.clearRect(0, 0, width, height);
-    this.ctx.drawImage(this.mapImage, 0, 0, width, height);
+    this.ctx.drawImage(
+      this.mapImage,
+      this.cameraX,
+      this.cameraY,
+      view.width,
+      view.height,
+      0,
+      0,
+      width,
+      height,
+    );
 
-    const scaleX = width / BASE_SCENE.width;
-    const scaleY = height / BASE_SCENE.height;
+    const scaleX = width / view.width;
+    const scaleY = height / view.height;
     const pulse = 0.65 + Math.sin(timestamp * 0.005) * 0.35;
     const elapsed = timestamp - this.startTimestamp;
 
     for (const item of this.items) {
-      const dx = item.x * scaleX;
-      const dy = item.y * scaleY;
+      const dx = (item.x - this.cameraX) * scaleX;
+      const dy = (item.y - this.cameraY) * scaleY;
       const dw = item.drawWidth * scaleX;
       const dh = item.drawHeight * scaleY;
       const isHovered = item.id === this.hoveredItemId;
@@ -248,10 +562,15 @@ export class PointClickGame {
 
   destroy() {
     cancelAnimationFrame(this.animationFrameId);
+    this.canvas.removeEventListener("pointerdown", this.boundOnPointerDown);
     this.canvas.removeEventListener("pointermove", this.boundOnPointerMove);
+    this.canvas.removeEventListener("pointerup", this.boundOnPointerUp);
+    this.canvas.removeEventListener("pointercancel", this.boundOnPointerCancel);
     this.canvas.removeEventListener("pointerleave", this.boundOnPointerLeave);
-    this.canvas.removeEventListener("click", this.boundOnClick);
+    this.canvas.removeEventListener("lostpointercapture", this.boundOnPointerLostCapture);
+    this.canvas.removeEventListener("wheel", this.boundOnWheel);
     window.removeEventListener("resize", this.boundOnResize);
+    this.pointers.clear();
   }
 
   getFrameIndex(item, elapsedMs = performance.now() - this.startTimestamp) {
