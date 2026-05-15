@@ -276,7 +276,7 @@ export function App() {
         <div className="game-overlay" role="dialog" aria-modal="true">
           <div className="game-overlay__card">
             <p className="game-overlay__title">
-              {gamePhase === GAME_PHASE.INTRO ? "UGAME Квест по ИБ" : "Игра завершена"}
+              {gamePhase === GAME_PHASE.INTRO ? "UGANE Квест по ИБ" : "Игра завершена"}
             </p>
 
             {gamePhase === GAME_PHASE.INTRO ? (

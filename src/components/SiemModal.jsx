@@ -231,7 +231,7 @@ export function SiemModal({ onClose, onAlertResolved }) {
       <div className="siem-modal">
         <header className="siem-modal__header">
           <div>
-            <p className="siem-modal__title">SIEM UGAME</p>
+            <p className="siem-modal__title">SIEM UGANE</p>
             <p className="siem-modal__subtitle">События генерируются в реальном времени. Оцени каждое срабатывание.</p>
           </div>
 
