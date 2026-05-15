@@ -303,8 +303,9 @@ export class PointClickGame {
   }
 
   onPointerLeave(event) {
-    if (this.pointers.has(event.pointerId)) {
-      this.cleanupPointer(event.pointerId);
+    // Для touch не обрабатываем pointerleave: иначе можно потерять tap до pointerup.
+    if (event.pointerType !== "mouse") {
+      return;
     }
 
     if (this.isPointerDown || this.isPinching) return;
